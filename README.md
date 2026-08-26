@@ -49,8 +49,8 @@ npm run build
 | Enter / Space | Open the dropdown from the trigger |
 | Arrow Down | Move to next option |
 | Arrow Up | Move to previous option |
-| Home | Move to first option |
-| End | Move to last option |
+| Home / Fn + Left arrow  | Move to first option |
+| End / Fn + Right arrow | Move to last option |
 | Space | Toggle active option |
 | Ctrl+A / Cmd+A | Select all filtered options; repeat to clear |
 | Printable characters | Type-ahead search |

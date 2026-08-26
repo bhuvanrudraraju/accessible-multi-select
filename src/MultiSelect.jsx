@@ -1,3 +1,4 @@
+
 import React from "react";
 
 export default function MultiSelect({
@@ -10,6 +11,7 @@ export default function MultiSelect({
   const [open, setOpen] = React.useState(false);
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [query, setQuery] = React.useState("");
+
   const rootRef = React.useRef(null);
   const buttonRef = React.useRef(null);
   const listboxRef = React.useRef(null);
@@ -22,109 +24,149 @@ export default function MultiSelect({
   const buttonId = `${listboxId}-button`;
 
   const filteredOptions = React.useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return options;
+    const search = query.trim().toLowerCase();
+
+    if (!search) return options;
+
     return options.filter((option) =>
-      option.toLowerCase().includes(normalized)
+      option.toLowerCase().includes(search)
     );
   }, [options, query]);
 
-  const selectedSet = React.useMemo(() => new Set(value), [value]);
+  const selectedSet = React.useMemo(
+    () => new Set(value),
+    [value]
+  );
 
   React.useEffect(() => {
-    const onPointerDown = (event) => {
+    const handleOutsideClick = (event) => {
       if (!rootRef.current?.contains(event.target)) {
-        setOpen(false);
-        setQuery("");
+        closeDropdown();
       }
     };
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+
+    document.addEventListener("pointerdown", handleOutsideClick);
+
+    return () => {
+      document.removeEventListener(
+        "pointerdown",
+        handleOutsideClick
+      );
+    };
   }, []);
 
   React.useEffect(() => {
     if (!open) return;
-    const firstSelected = filteredOptions.findIndex((item) =>
-      selectedSet.has(item)
+
+    const firstSelectedIndex = filteredOptions.findIndex(
+      (option) => selectedSet.has(option)
     );
-    setActiveIndex(firstSelected >= 0 ? firstSelected : 0);
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    setActiveIndex(
+      firstSelectedIndex >= 0 ? firstSelectedIndex : 0
+    );
+
+    requestAnimationFrame(() => {
+      listboxRef.current?.focus();
+    });
+  }, [open]);
 
   React.useEffect(() => {
     if (!open) return;
-    optionRefs.current[activeIndex]?.scrollIntoView({ block: "nearest" });
+
+    optionRefs.current[activeIndex]?.scrollIntoView({
+      block: "nearest"
+    });
   }, [activeIndex, open]);
 
-  const close = () => {
+  function openDropdown() {
+    setOpen(true);
+  }
+
+  function closeDropdown() {
     setOpen(false);
     setQuery("");
-    buttonRef.current?.focus();
-  };
 
-  const toggleOption = (option) => {
+    requestAnimationFrame(() => {
+      buttonRef.current?.focus();
+    });
+  }
+
+  function toggleOption(option) {
     const next = selectedSet.has(option)
       ? value.filter((item) => item !== option)
       : [...value, option];
 
     onChange(next);
-  };
+  }
 
-  const move = (delta) => {
+  function moveActive(delta) {
     if (!filteredOptions.length) return;
+
     setActiveIndex((current) => {
       const next = current + delta;
-      return Math.max(0, Math.min(filteredOptions.length - 1, next));
+
+      return Math.max(
+        0,
+        Math.min(filteredOptions.length - 1, next)
+      );
     });
-  };
+  }
 
-  const selectAll = () => {
-    const allSelected = filteredOptions.every((option) => selectedSet.has(option));
+  function selectAll() {
+    const allSelected =
+      filteredOptions.length > 0 &&
+      filteredOptions.every((option) =>
+        selectedSet.has(option)
+      );
+
     if (allSelected) {
-      onChange(value.filter((item) => !filteredOptions.includes(item)));
-    } else {
-      const next = [...value];
-      filteredOptions.forEach((option) => {
-        if (!next.includes(option)) next.push(option);
-      });
-      onChange(next);
-    }
-  };
-
-  const handleKeyDown = (event) => {
-    if (!open) {
-      if (
-        event.key === "Enter" ||
-        event.key === " " ||
-        event.key === "ArrowDown" ||
-        event.key === "ArrowUp"
-      ) {
-        event.preventDefault();
-        setOpen(true);
-      }
+      onChange(
+        value.filter(
+          (item) => !filteredOptions.includes(item)
+        )
+      );
       return;
     }
 
+    const next = [...value];
+
+    filteredOptions.forEach((option) => {
+      if (!next.includes(option)) {
+        next.push(option);
+      }
+    });
+
+    onChange(next);
+  }
+
+  function handleButtonKeyDown(event) {
+    if (
+      event.key === "Enter" ||
+      event.key === " " ||
+      event.key === "ArrowDown"
+    ) {
+      event.preventDefault();
+      openDropdown();
+    }
+  }
+
+  function handleListboxKeyDown(event) {
     if (event.key === "Escape") {
       event.preventDefault();
-      close();
-      return;
-    }
-
-    if (event.key === "Tab") {
-      setOpen(false);
-      setQuery("");
+      closeDropdown();
       return;
     }
 
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      move(1);
+      moveActive(1);
       return;
     }
 
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      move(-1);
+      moveActive(-1);
       return;
     }
 
@@ -136,47 +178,84 @@ export default function MultiSelect({
 
     if (event.key === "End") {
       event.preventDefault();
-      setActiveIndex(Math.max(0, filteredOptions.length - 1));
+      setActiveIndex(
+        Math.max(0, filteredOptions.length - 1)
+      );
       return;
     }
 
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key.toLowerCase() === "a"
+    ) {
       event.preventDefault();
       selectAll();
       return;
     }
 
-    if (event.key === " " && filteredOptions[activeIndex]) {
+    if (
+      event.key === " " ||
+      event.key === "Enter"
+    ) {
       event.preventDefault();
-      toggleOption(filteredOptions[activeIndex]);
+
+      const activeOption =
+        filteredOptions[activeIndex];
+
+      if (activeOption) {
+        toggleOption(activeOption);
+      }
+
       return;
     }
 
-    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
-      const char = event.key.toLowerCase();
-      typeaheadRef.current += char;
+    if (
+      event.key.length === 1 &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey
+    ) {
+      const character = event.key.toLowerCase();
+
+      typeaheadRef.current += character;
+
       window.clearTimeout(typeaheadTimer.current);
+
       typeaheadTimer.current = window.setTimeout(() => {
         typeaheadRef.current = "";
       }, 700);
 
+      const searchTerm = typeaheadRef.current;
+
       const start = activeIndex + 1;
-      const ordered = [
+
+      const orderedOptions = [
         ...filteredOptions.slice(start),
         ...filteredOptions.slice(0, start)
       ];
-      const match = ordered.find(
-        (option) => option.toLowerCase().startsWith(typeaheadRef.current)
+
+      const match = orderedOptions.find((option) =>
+        option.toLowerCase().startsWith(searchTerm)
       );
+
       if (match) {
-        setActiveIndex(filteredOptions.indexOf(match));
+        setActiveIndex(
+          filteredOptions.indexOf(match)
+        );
       }
     }
-  };
+  }
 
   return (
-    <div className="multi-select" ref={rootRef}>
-      <label id={labelId} className="field-label" htmlFor={buttonId}>
+    <div
+      className="multi-select"
+      ref={rootRef}
+    >
+      <label
+        id={labelId}
+        className="field-label"
+        htmlFor={buttonId}
+      >
         {label}
       </label>
 
@@ -184,25 +263,51 @@ export default function MultiSelect({
         ref={buttonRef}
         id={buttonId}
         type="button"
-        className={`trigger ${open ? "trigger-open" : ""}`}
+        className={`trigger ${
+          open ? "trigger-open" : ""
+        }`}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listboxId}
-        onClick={() => setOpen((current) => !current)}
-        onKeyDown={handleKeyDown}
+        onClick={() => {
+          if (open) {
+            closeDropdown();
+          } else {
+            openDropdown();
+          }
+        }}
+        onKeyDown={handleButtonKeyDown}
       >
-        <span className={value.length ? "trigger-value" : "trigger-placeholder"}>
-          {value.length ? `${value.length} selected` : placeholder}
+        <span
+          className={
+            value.length
+              ? "trigger-value"
+              : "trigger-placeholder"
+          }
+        >
+          {value.length
+            ? `${value.length} selected`
+            : placeholder}
         </span>
-        <span className="chevron" aria-hidden="true">⌄</span>
+
+        <span
+          className="chevron"
+          aria-hidden="true"
+        >
+          ⌄
+        </span>
       </button>
 
       {open && (
         <div className="panel">
           <div className="search-row">
-            <label className="sr-only" htmlFor={`${listboxId}-search`}>
+            <label
+              className="sr-only"
+              htmlFor={`${listboxId}-search`}
+            >
               Filter options
             </label>
+
             <input
               id={`${listboxId}-search`}
               className="search"
@@ -211,13 +316,19 @@ export default function MultiSelect({
                 setQuery(event.target.value);
                 setActiveIndex(0);
               }}
-              onKeyDown={handleKeyDown}
               placeholder="Filter options..."
               autoComplete="off"
             />
-            <button type="button" className="select-all" onClick={selectAll}>
-              {filteredOptions.length &&
-              filteredOptions.every((option) => selectedSet.has(option))
+
+            <button
+              type="button"
+              className="select-all"
+              onClick={selectAll}
+            >
+              {filteredOptions.length > 0 &&
+              filteredOptions.every((option) =>
+                selectedSet.has(option)
+              )
                 ? "Clear"
                 : "All"}
             </button>
@@ -236,51 +347,71 @@ export default function MultiSelect({
                 : undefined
             }
             tabIndex={0}
-            onKeyDown={handleKeyDown}
-            onFocus={() => {
-              if (filteredOptions.length) {
-                const firstSelected = filteredOptions.findIndex((item) =>
-                  selectedSet.has(item)
-                );
-                setActiveIndex(firstSelected >= 0 ? firstSelected : 0);
-              }
-            }}
+            onKeyDown={handleListboxKeyDown}
           >
-            {filteredOptions.length ? (
-              filteredOptions.map((option, index) => {
-                const selected = selectedSet.has(option);
-                const active = index === activeIndex;
-                return (
-                  <div
-                    key={option}
-                    id={`${listboxId}-option-${index}`}
-                    ref={(element) => {
-                      optionRefs.current[index] = element;
-                    }}
-                    className={`option ${active ? "active" : ""} ${selected ? "selected" : ""}`}
-                    role="option"
-                    aria-selected={selected}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => toggleOption(option)}
-                  >
-                    <span className={`checkbox ${selected ? "checked" : ""}`} aria-hidden="true">
-                      {selected ? "✓" : ""}
-                    </span>
-                    <span>{option}</span>
-                  </div>
-                );
-              })
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map(
+                (option, index) => {
+                  const selected =
+                    selectedSet.has(option);
+
+                  const active =
+                    index === activeIndex;
+
+                  return (
+                    <div
+                      key={option}
+                      id={`${listboxId}-option-${index}`}
+                      ref={(element) => {
+                        optionRefs.current[index] =
+                          element;
+                      }}
+                      className={`option ${
+                        active ? "active" : ""
+                      } ${
+                        selected ? "selected" : ""
+                      }`}
+                      role="option"
+                      aria-selected={selected}
+                      onMouseEnter={() =>
+                        setActiveIndex(index)
+                      }
+                      onMouseDown={(event) =>
+                        event.preventDefault()
+                      }
+                      onClick={() =>
+                        toggleOption(option)
+                      }
+                    >
+                      <span
+                        className={`checkbox ${
+                          selected ? "checked" : ""
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {selected ? "✓" : ""}
+                      </span>
+
+                      <span>{option}</span>
+                    </div>
+                  );
+                }
+              )
             ) : (
-              <div className="empty">No matching options</div>
+              <div className="empty">
+                No matching options
+              </div>
             )}
           </div>
 
           <div className="hint">
-            ↑ ↓ navigate · Space select · Home/End jump · Ctrl/Cmd+A select all · Esc close
+            ↑ ↓ navigate · Space/Enter select ·
+            Home/End jump · Ctrl/Cmd+A select all ·
+            Esc close
           </div>
         </div>
       )}
     </div>
   );
 }
+
